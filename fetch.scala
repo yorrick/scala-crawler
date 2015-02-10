@@ -17,6 +17,9 @@ import play.api.libs.ws._
 
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.io.Source.stdin
+import scala.util.{Success, Failure, Try}
+import scala.xml.{NodeSeq, XML}
 
 
 def buildClient(): NingWSClient = {
@@ -25,28 +28,39 @@ def buildClient(): NingWSClient = {
     new NingWSClient(builder.build)
 }
 
-def processResponse(response: WSResponse): String = {
-	response.body
+def getBaseURL(nodes: NodeSeq): Try[String] = {
+	val text = (nodes \ "Identify" \ "baseURL").text.trim
+	
+	if (text.isEmpty) {
+		Failure(new Exception("Could not find baseURL"))
+	} else {
+		Success(text)
+	}
+}
+
+def processResponse(response: WSResponse): Try[(String, String)] = {
+  for {
+		xml <- Try(XML.loadString(response.body) )
+		url <- getBaseURL(xml)
+		name <- Success((xml \ "Identify" \ "repositoryName").text.trim)
+	} yield (url, name)
 }
 
 
 val client = buildClient()
 
-val identifyCalls: Seq[Future[WSResponse]] = args map { url =>
+val identifyCalls: Iterator[Future[WSResponse]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
+	println(s"Fetching $url")
 	client.url(url).withQueryString("verb" -> "Identify").get
 }
 
-val completed: Future[Seq[WSResponse]] = Future.sequence(identifyCalls)
+val completed: Future[Iterator[WSResponse]] = Future.sequence(identifyCalls)
 
 completed map { responses =>
-	client.close()
-
 	val results = responses map processResponse
-
 	results foreach println
+	
+	// close client once everything is done
+	client.close()
 }
-
-// client.close()
-
-
 
