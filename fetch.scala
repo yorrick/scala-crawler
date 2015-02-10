@@ -14,35 +14,39 @@ libraryDependencies ++= Seq(
 import com.ning.http.client._
 import play.api.libs.ws.ning._
 import play.api.libs.ws._
-import scala.concurrent.ExecutionContext.Implicits.global
 
-// val config = new NingAsyncHttpClientConfigBuilder(DefaultWSClientConfig()).build()
-// val builder = new AsyncHttpClientConfig.Builder(config)
-// val wsClient:WSClient = new NingWSClient(builder.build())
+import scala.concurrent._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 def buildClient(): NingWSClient = {
-	val clientConfig = new DefaultWSClientConfig()
-	val secureDefaults: AsyncHttpClientConfig = new NingAsyncHttpClientConfigBuilder(clientConfig).build()
-	// You can directly use the builder for specific options once you have secure TLS defaults...
-	val builder = new AsyncHttpClientConfig.Builder(secureDefaults)
-	builder.setCompressionEnabled(true)
-	val secureDefaultsWithSpecificOptions: AsyncHttpClientConfig = builder.build()
-	new NingWSClient(secureDefaultsWithSpecificOptions)
+	val config = new NingAsyncHttpClientConfigBuilder(DefaultWSClientConfig()).build
+    val builder = new AsyncHttpClientConfig.Builder(config)
+    new NingWSClient(builder.build)
+}
+
+def processResponse(response: WSResponse): String = {
+	response.body
 }
 
 
 val client = buildClient()
 
+val identifyCalls: Seq[Future[WSResponse]] = args map { url =>
+	client.url(url).withQueryString("verb" -> "Identify").get
+}
 
-println("Fetching google")
-val response = client.url("http://google.com").get
+val completed: Future[Seq[WSResponse]] = Future.sequence(identifyCalls)
 
-response.foreach(r => {
-	println(r.body) 
-	// not the best place to close the client, 
-	// but it ensures we dont close the threads before the response arrives 
+completed map { responses =>
 	client.close()
-})
+
+	val results = responses map processResponse
+
+	results foreach println
+}
+
+// client.close()
+
 
 
