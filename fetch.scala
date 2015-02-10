@@ -20,6 +20,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source.stdin
 import scala.util.{Success, Failure, Try}
 import scala.xml.{NodeSeq, XML}
+import scala.concurrent.duration._
 
 
 def buildClient(): NingWSClient = {
@@ -28,39 +29,36 @@ def buildClient(): NingWSClient = {
     new NingWSClient(builder.build)
 }
 
-def getBaseURL(nodes: NodeSeq): Try[String] = {
-	val text = (nodes \ "Identify" \ "baseURL").text.trim
-	
-	if (text.isEmpty) {
-		Failure(new Exception("Could not find baseURL"))
-	} else {
-		Success(text)
-	}
-}
 
-def processResponse(response: WSResponse): Try[(String, String)] = {
-  for {
-		xml <- Try(XML.loadString(response.body) )
-		url <- getBaseURL(xml)
-		name <- Success((xml \ "Identify" \ "repositoryName").text.trim)
-	} yield (url, name)
-}
+def processResponse(response: WSResponse): (String, String) = Try {
+	val xml = XML.loadString(response.body)
+	val url = (xml \ "Identify" \ "baseURL").text.trim
+	val name = (xml \ "Identify" \ "repositoryName").text.trim
+	
+	(url, name)
+} getOrElse(("None", "None"))
 
 
 val client = buildClient()
 
-val identifyCalls: Iterator[Future[WSResponse]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
+val identifyCalls: Iterator[(String, Future[(String, String)])] = stdin.getLines.filterNot(_.isEmpty) map { url =>
 	println(s"Fetching $url")
-	client.url(url).withQueryString("verb" -> "Identify").get
-}
-
-val completed: Future[Iterator[WSResponse]] = Future.sequence(identifyCalls)
-
-completed map { responses =>
-	val results = responses map processResponse
-	results foreach println
 	
-	// close client once everything is done
-	client.close()
+	
+	val response: Future[WSResponse] = client.url(url).withQueryString("verb" -> "Identify").get
+	val result: Future[(String, String)] = response.map(processResponse).andThen {
+		case Success(tuple) => println(s"$url: $tuple")
+		case Failure(t) => println(s"$url: Error found")
+	}
+		
+	(url, result)
 }
+
+
+// wait for the futures to complete before closing the client
+val completed: Future[_] = Future.sequence(identifyCalls.map(tuple => tuple._2))
+println("Waiting for processing to finish")
+Await.result(completed, 10 minutes)
+println("Closing client")
+client.close()
 

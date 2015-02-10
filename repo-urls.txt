@@ -1,3 +1,6 @@
+http://www.informatik.uni-stuttgart.de/cgi-bin/OAI/OAI.pl
 http://entscholar.net/index.php/index/oai
-http://ir.ub.rug.nl/oai/
-
+http://eprints.sunan-ampel.ac.id/cgi/oai2
+http://eprints.upnjatim.ac.id/cgi/oai2
+http://press.epoka.edu.al/index.php/index/oai
+http://pub.bsalut.net/cgi/oai2.cgi
