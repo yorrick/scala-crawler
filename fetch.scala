@@ -5,6 +5,8 @@
 scalaVersion := "2.10.4"
 
 resolvers += "Typesafe Releases" at "https://repo.typesafe.com/typesafe/releases/"
+	
+logLevel := Level.Error
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-ws" % "2.3.7"
@@ -30,35 +32,59 @@ def buildClient(): NingWSClient = {
 }
 
 
-def processResponse(response: WSResponse): (String, String) = Try {
-	val xml = XML.loadString(response.body)
-	val url = (xml \ "Identify" \ "baseURL").text.trim
-	val name = (xml \ "Identify" \ "repositoryName").text.trim
-	
-	(url, name)
-} getOrElse(("None", "None"))
+case class Identify(queriedUrl: String, name: String = "", url: String = "") {
+	def toCSV: String = s"$queriedUrl,$name,$url"
+}
+
+object Identify {
+	def fromWSResponse(queriedUrl: String, response: WSResponse) = Try {
+		val xml = XML.loadString(response.body)
+		val url = (xml \ "Identify" \ "baseURL").text.trim
+		val name = (xml \ "Identify" \ "repositoryName").text.trim
+
+		Identify(queriedUrl, url, name)
+	} getOrElse(Identify(queriedUrl))
+}
 
 
+case class ListMetadataFormats() {
+	def toCSV: String = s""
+}
+
+object ListMetadataFormats {
+	def fromWSResponse(response: WSResponse) = Try {
+		val xml = XML.loadString(response.body)
+
+		ListMetadataFormats()
+	} getOrElse(ListMetadataFormats())
+}
+
+
+
+System.err.println("Opening connection")
 val client = buildClient()
 
-val identifyCalls: Iterator[(String, Future[(String, String)])] = stdin.getLines.filterNot(_.isEmpty) map { url =>
-	println(s"Fetching $url")
-	
-	
-	val response: Future[WSResponse] = client.url(url).withQueryString("verb" -> "Identify").get
-	val result: Future[(String, String)] = response.map(processResponse).andThen {
-		case Success(tuple) => println(s"$url: $tuple")
-		case Failure(t) => println(s"$url: Error found")
-	}
+val identifyCalls: Iterator[Future[(Identify, ListMetadataFormats)]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
+	System.err.println(s"Fetching $url")
+
+	val queryResults = for {
+		identify <- client.url(url).withQueryString("verb" -> "Identify").get.map(r => Identify.fromWSResponse(url, r))
+		listMetadataFormats <- client.url(url).withQueryString("verb" -> "ListMetadataFormats").get.map(r => ListMetadataFormats.fromWSResponse(r))
+	} yield (identify, listMetadataFormats)
 		
-	(url, result)
+	val futureRefs: Future[(Identify, ListMetadataFormats)] = queryResults andThen {
+		case Success((identify, listMetadataFormats)) => println(s"${identify.toCSV},${listMetadataFormats.toCSV}")
+		case Failure(t) => System.err.println(s"$url: Error found")
+	}
+
+	futureRefs
 }
 
 
 // wait for the futures to complete before closing the client
-val completed: Future[_] = Future.sequence(identifyCalls.map(tuple => tuple._2))
-println("Waiting for processing to finish")
+val completed: Future[_] = Future.sequence(identifyCalls)
+System.err.println("Waiting for processing to finish")
 Await.result(completed, 10 minutes)
-println("Closing client")
+System.err.println("Closing client")
 client.close()
 

@@ -1,0 +1,6 @@
+[0m[[0minfo[0m] [0mSet current project to root-31ddc7c15ac8cc449a02 (in build file:/root/.conscript/boot/31ddc7c15ac8cc449a02/)[0m
+[0m[[31merror[0m] [0m/data/./fetch.scala:74: ')' expected but ']' found.[0m
+[0m[[31merror[0m] [0m	val futureRefs: Future[(Identify] = queryResults andThen {[0m
+[0m[[31merror[0m] [0m	                                ^[0m
+[0m[[31merror[0m] [0mone error found[0m
+[0m[[31merror[0m] [0m(compile:[31mcompile[0m) Compilation failed[0m
