@@ -33,10 +33,13 @@ def buildClient(): NingWSClient = {
 
 
 
+val CSV_SEPARATOR = "#"
+
+
 
 
 case class Identify(queriedUrl: String, name: String = "", url: String = "") {
-	lazy val toCSV: String = s"$queriedUrl,$name,$url"
+	lazy val toCSV: String = s"$queriedUrl$CSV_SEPARATOR$name$CSV_SEPARATOR$url"
 }
 
 object Identify {
@@ -69,7 +72,7 @@ object Identify {
 
 
 case class ListIdentifiers(articleNumber: Option[Int] = None) {
-	lazy val toCSV = s"${articleNumber.getOrElse(-1)}"
+	lazy val toCSV = articleNumber.map(_.toString).getOrElse("")
 }
 
 object ListIdentifiers {
@@ -105,7 +108,9 @@ val identifyCalls: Iterator[Future[(Identify, ListIdentifiers)]] = stdin.getLine
 	} yield (identify, listIdentifiers)
 		
 	val futureRefs: Future[(Identify, ListIdentifiers)] = queryResults andThen {
-		case Success((identify, listIdentifiers)) => println(s"${identify.toCSV},${listIdentifiers.toCSV}")
+		case Success((identify, listIdentifiers)) => {
+			println(s"${identify.toCSV}$CSV_SEPARATOR${listIdentifiers.toCSV}")
+		}
 		case Failure(t) => System.err.println(s"$url: Error found")
 	}
 
