@@ -21,7 +21,7 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source.stdin
 import scala.util.{Success, Failure, Try}
-import scala.xml.{NodeSeq, XML}
+import scala.xml.{Node, NodeSeq, XML}
 import scala.concurrent.duration._
 
 
@@ -32,8 +32,11 @@ def buildClient(): NingWSClient = {
 }
 
 
+
+
+
 case class Identify(queriedUrl: String, name: String = "", url: String = "") {
-	def toCSV: String = s"$queriedUrl,$name,$url"
+	lazy val toCSV: String = s"$queriedUrl,$name,$url"
 }
 
 object Identify {
@@ -47,33 +50,62 @@ object Identify {
 }
 
 
-case class ListMetadataFormats() {
-	def toCSV: String = s""
+
+
+
+//case class ListMetadataFormats() {
+//	def toCSV: String = s""
+//}
+//
+//object ListMetadataFormats {
+//	def fromWSResponse(response: WSResponse) = Try {
+//		val xml = XML.loadString(response.body)
+//
+//		ListMetadataFormats()
+//	} getOrElse(ListMetadataFormats())
+//}
+
+
+
+
+case class ListIdentifiers(articleNumber: Option[Int] = None) {
+	lazy val toCSV = s"${articleNumber.getOrElse(-1)}"
 }
 
-object ListMetadataFormats {
+object ListIdentifiers {
 	def fromWSResponse(response: WSResponse) = Try {
 		val xml = XML.loadString(response.body)
-
-		ListMetadataFormats()
-	} getOrElse(ListMetadataFormats())
+		
+		val completeListSizeAttributes: NodeSeq = (xml \ "ListIdentifiers" \ "resumptionToken") flatMap { _.attribute("completeListSize").getOrElse(Seq()) }
+		val articleNumber = Try(completeListSizeAttributes.text.toInt).toOption
+		
+		ListIdentifiers(articleNumber)
+	} getOrElse(ListIdentifiers())
+	
 }
+
 
 
 
 System.err.println("Opening connection")
 val client = buildClient()
 
-val identifyCalls: Iterator[Future[(Identify, ListMetadataFormats)]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
+// http://doaj.org/oai.article?verb=Identify
+def identify(url: String) = client.url(url).withQueryString("verb" -> "Identify")
+// http://doaj.org/oai.article?metadataPrefix=oai_dc&verb=ListIdentifiers
+def listIdentifiers(url: String) = client.url(url).withQueryString("verb" -> "ListIdentifiers", "metadataPrefix" -> "oai_dc")
+
+
+val identifyCalls: Iterator[Future[(Identify, ListIdentifiers)]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
 	System.err.println(s"Fetching $url")
 
 	val queryResults = for {
-		identify <- client.url(url).withQueryString("verb" -> "Identify").get.map(r => Identify.fromWSResponse(url, r))
-		listMetadataFormats <- client.url(url).withQueryString("verb" -> "ListMetadataFormats").get.map(r => ListMetadataFormats.fromWSResponse(r))
-	} yield (identify, listMetadataFormats)
+		identify <- identify(url).get.map(r => Identify.fromWSResponse(url, r))
+		listIdentifiers <- listIdentifiers(url).get.map(r => ListIdentifiers.fromWSResponse(r))
+	} yield (identify, listIdentifiers)
 		
-	val futureRefs: Future[(Identify, ListMetadataFormats)] = queryResults andThen {
-		case Success((identify, listMetadataFormats)) => println(s"${identify.toCSV},${listMetadataFormats.toCSV}")
+	val futureRefs: Future[(Identify, ListIdentifiers)] = queryResults andThen {
+		case Success((identify, listIdentifiers)) => println(s"${identify.toCSV},${listIdentifiers.toCSV}")
 		case Failure(t) => System.err.println(s"$url: Error found")
 	}
 
