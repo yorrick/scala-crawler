@@ -9,5 +9,5 @@ docker run -ti --name scala-scripts --volume $PWD:/data --memory=3g --cpuset=3 o
 ## Launch fetch
 
 ```
-cat repo-urls.txt | ./fetch.scala
+cat repo-urls.txt | ./fetch.scala > repo-result.txt
 ```
