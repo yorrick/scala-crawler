@@ -36,7 +36,7 @@ def buildClient(): NingWSClient = {
 
 
 val CSV_SEPARATOR = ";"
-val REQUEST_TIMEOUT = 60
+val REQUEST_TIMEOUT = 6000
 
 
 def cleanString(string: String) = string.replaceAll(CSV_SEPARATOR, "").replaceAll("\n", "")
@@ -47,6 +47,7 @@ case class Identify(name: String = "", url: String = "") {
 }
 
 object Identify {
+	
 	def fromWSResponse(response: WSResponse): Future[Identify] = Future {
 		val xml = XML.loadString(response.body)
 		val url = cleanString((xml \ "Identify" \ "baseURL").text.trim)
@@ -56,6 +57,7 @@ object Identify {
 	} recover { 
 		case _ => Identify()
 	}
+	
 }
 
 
@@ -65,6 +67,7 @@ case class ListIdentifiers(articleNumber: Option[Int] = None) {
 }
 
 object ListIdentifiers {
+	
 	def fromWSResponse(response: WSResponse) = Future {
 		val xml = XML.loadString(response.body)
 
@@ -77,7 +80,9 @@ object ListIdentifiers {
 	} recover { 
 		case _ => ListIdentifiers() 
 	}
+	
 }
+
 
 
 
@@ -94,8 +99,8 @@ val client = buildClient()
 // http://doaj.org/oai.article?verb=Identify
 def identify(url: String): Future[WSResponse] = try {
 	client.url(url)
+		.withRequestTimeout(REQUEST_TIMEOUT)
 		.withFollowRedirects(true)
-	//	.withRequestTimeout(REQUEST_TIMEOUT)
 		.withQueryString(
 				"verb" -> "Identify"
 		).get
@@ -105,8 +110,8 @@ def identify(url: String): Future[WSResponse] = try {
 
 // http://doaj.org/oai.article?metadataPrefix=oai_dc&verb=ListIdentifiers
 def listIdentifiers(url: String): Future[WSResponse] = 	client.url(url)
+	.withRequestTimeout(REQUEST_TIMEOUT)
 	.withFollowRedirects(true)
-//	.withRequestTimeout(REQUEST_TIMEOUT)
 	.withQueryString(
 		"verb" -> "ListIdentifiers",
 		"metadataPrefix" -> "oai_dc"
@@ -117,7 +122,7 @@ def listIdentifiers(url: String): Future[WSResponse] = 	client.url(url)
 val identifyCalls: Iterator[Future[Info]] = stdin.getLines.filterNot(_.isEmpty) map { url =>
 	System.err.println(s"Fetching $url")
 
-	// TODO fix bug if list identifiers fails, nothing returns
+	// TODO check that if list identifiers fails, identify info is still returned
 	val queryResults: Future[Info] = for {
 		identifyResponse <- identify(url)
 		identify <- Identify.fromWSResponse(identifyResponse)
@@ -141,7 +146,7 @@ val completed: Future[_] = Future.sequence(identifyCalls)
 
 try {
 	System.err.println("Waiting for processing to finish")
-	Await.result(completed, 10 minutes)
+	Await.result(completed, 1 minutes)
 } catch {
 	case t: Throwable => System.err.println(s"Got error waiting for process to finish $t")
 } finally {
