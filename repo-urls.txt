@@ -1678,7 +1678,6 @@ http://taxreview.law.pitt.edu/ojs/index.php/taxreview/oai
 http://pkp.ubc.ca/harvester/oai/
 http://www.flhiddentreasures.com/oai/provider
 http://horizonepublishing.com/journals/index.php/PST/oai
-http://jprastcouk.fatcow.com/ojs-2.3.7 2/index.php/PSJT/oai
 http://www.cogitatiopress.com/ojs/index.php/politicsandgovernance/oai
 http://czasopisma.upjp2.edu.pl/poloniasacra/oai
 http://publications.polymtl.ca/cgi/oai2

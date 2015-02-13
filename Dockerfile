@@ -12,5 +12,10 @@ ENV PATH=$PATH:/root/bin'
 
 RUN cs sbt/sbt --branch 0.13.5
 
+RUN mkdir /scripts
+
+ADD fetch.scala /scripts/
+ADD repo-urls.txt /scripts/repo-urls.txt
+
 CMD ["/bin/bash"]
 
