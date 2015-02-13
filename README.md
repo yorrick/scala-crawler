@@ -9,7 +9,7 @@ build.sbt file is there only for IDE support.
 
 ```
 docker build --tag onescience/scala-scripts . && docker push onescience/scala-scripts
-sudo docker pull onescience/scala-scripts && sudo docker run -d --volume $PWD:/data --memory=3g onescience/scala-scripts /bin/bash -c 'cat /scripts/repo-urls.txt | /scripts/fetch.scala > /data/repo-result.csv'
+sudo docker pull onescience/scala-scripts:latest && sudo docker run -d --name scala-scripts --volume $PWD:/data --memory=3g onescience/scala-scripts:latest /bin/bash -c 'cat /scripts/repo-urls.txt | /scripts/fetch.scala > /data/repo-result.csv'
 ```
 
 ## Launch fetch
